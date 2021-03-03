@@ -50,14 +50,16 @@ class A2CAgent:
 
             # put all in storage
             storage.action.append(action)
-            storage.critic_value.append(prediction['critic_value'].cpu().detach().numpy())
-            # TODO maybe needs to be a pytorch tensor
-            storage.done.append(done[0])
-            storage.entropy.append(prediction['entropy'].cpu().detach().numpy())
-            storage.log_prob_a.append(prediction['log_prob_a'].cpu().detach().numpy())
-            storage.mean_a.append(prediction['mean_a'].cpu().detach().numpy())
-            # TODO maybe needs to be a pytorch tensor
-            storage.reward.append(reward[0])
+            storage.critic_value.append(prediction['critic_value'])
+
+            # needs to be a pytorch tensor just like everything else
+            storage.done.append(torch.from_numpy(np.array(done)).to(device))
+            storage.entropy.append(prediction['entropy'])
+            storage.log_prob_a.append(prediction['log_prob_a'])
+            storage.mean_a.append(prediction['mean_a'])
+
+            # needs to be a pytorch tensor just like everything else
+            storage.reward.append(torch.from_numpy(np.array(reward)).to(device))
 
             # init advantage and return values in storage
             storage.advantage.append(None)
@@ -67,7 +69,8 @@ class A2CAgent:
 
             states = next_states  # roll over states to next time step
             if done[0]:  # exit loop if episode finished
-                break
+                # TODO check if this is correct to return completely not just a break
+                return score
 
         # run actor once more
         state_tensor = torch.from_numpy(states).float().to(device)
@@ -76,7 +79,7 @@ class A2CAgent:
         # TODO maybe uder fp32 explicitly here before "from_numpy"
         # advantages = torch.from_numpy((np.zeros(num_workers, 1))).to(device)
 
-        returns = prediction['critic_value'].cpu().detach().numpy()
+        returns = prediction['critic_value'].detach()
 
         # reverse fill advantage and return
         for i in reversed(range(number_of_actor_runs)):
@@ -89,9 +92,16 @@ class A2CAgent:
 
         # calc the loss
         # TODO check if this is correct
-        policy_loss = -(storage.log_prob_a * storage.advantage).mean()
-        value_loss = 0.5 * (storage.returns - storage.critic_value).pow(2).mean()
-        entropy_loss = storage.entropy.mean()
+        log_prob_a_array = torch.cat(storage.log_prob_a).squeeze()
+        advantage_array = torch.cat(storage.advantage).squeeze()
+        policy_loss = -(log_prob_a_array * advantage_array).mean()
+
+        return_array = torch.cat(storage.returns).squeeze()
+        critic_value_array = torch.cat(storage.critic_value).squeeze()
+        value_loss = 0.5 * (return_array - critic_value_array).pow(2).mean()
+
+        entropy_array = torch.cat(storage.entropy).squeeze()
+        entropy_loss = entropy_array.mean()
 
         self.optimizer.zero_grad()
         (policy_loss + entropy_weight * entropy_loss + value_loss_weight * value_loss).backward()

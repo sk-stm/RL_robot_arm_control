@@ -41,13 +41,13 @@ def init_env():
     print('There are {} agents. Each observes a state with length: {}'.format(agent_states.shape[0], state_size))
     print('The state for the first agent looks like:', agent_states[0])
 
-    env_info = env.reset(train_mode=False)[brain_name]     # reset the environment
+    env_info = env.reset(train_mode=True)[brain_name]     # reset the environment
     agent_states = env_info.vector_observations                  # get the current state (for each agent)
 
     return brain_name, num_agents, agent_states, state_size, action_size
 
 
-num_episodes = 10
+num_episodes = 1000
 
 
 def run_environment(brain_name, num_agents, agent_states, state_size, action_size):
@@ -64,7 +64,7 @@ def run_environment(brain_name, num_agents, agent_states, state_size, action_siz
         # TODO break if too many steps taken
 
         score = agent.step(agent_states)
-        scores_window. append(score)
+        scores_window.append(score)
 
         print('\rEpisode {}\tAverage Score: {:.2f}'.format(i_episode, np.mean(scores_window)), end="")
 
