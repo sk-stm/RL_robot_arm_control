@@ -47,14 +47,12 @@ def init_env():
     return brain_name, num_agents, agent_states, state_size, action_size
 
 
-num_episodes = 1000
+num_episodes = 100000
 
 
 def run_environment(brain_name, num_agents, agent_states, state_size, action_size):
     scores = np.zeros(num_agents)                          # initialize the score (for each agent)
     agent = A2CAgent(env=env, brain_name=brain_name, state_size=state_size, action_size=action_size)
-
-    scores_window = deque(maxlen=100)
 
     for i_episode in range(1, num_episodes + 1):
         # TODO save after so many steps
@@ -63,12 +61,15 @@ def run_environment(brain_name, num_agents, agent_states, state_size, action_siz
 
         # TODO break if too many steps taken
 
-        score = agent.step(agent_states)
-        scores_window.append(score)
+        # teach the agent
+        agent.step(agent_states)
 
-        print('\rEpisode {}\tAverage Score: {:.2f}'.format(i_episode, np.mean(scores_window)), end="")
-
-    return scores_window
+        # evaluate every so often
+        if i_episode%100 == 0:
+            scores_window = agent.evaluate(agent_states)
+            print('\rEpisode {}\tAverage Score: {:.2f}'.format(i_episode, np.mean(scores_window)), end="\n")
+        else:
+            print('\rEpisode {}'.format(i_episode), end="")
 
 
 if __name__ == "__main__":
