@@ -1,6 +1,6 @@
 from collections import deque
 
-from actor_critic_net import ActorCriticNet
+from actor_critic_net_all_in_one import ActorCriticNet
 import torch.optim as optim
 import numpy as np
 import torch
@@ -33,6 +33,7 @@ class A2CAgent:
         # run the actor
         storage = Storage()
 
+        # N-step TD error
         for i in range(number_of_actor_runs):
             #actions = np.random.randn(self.num_agents, self.action_size)  # select an action (for each agent)
             #actions = np.clip(actions, -1, 1)  # all actions between -1 and 1
@@ -76,16 +77,16 @@ class A2CAgent:
         state_tensor = torch.from_numpy(states).float().to(device)
         prediction = self.network(state_tensor)
 
-        returns = prediction['critic_value'].detach()
+        returns_of_next_state = prediction['critic_value'].detach()
 
         # reverse fill advantage and return
         #for i in reversed(range(number_of_actor_runs)):
         for i in reversed(range(len(storage.action))):
-            returns = storage.reward[i] + discount_factor * storage.done[i] * returns
-            advantages = returns - storage.critic_value[i].detach()
+            returns_of_next_state = storage.reward[i] + discount_factor * storage.done[i] * returns_of_next_state
+            advantages = returns_of_next_state - storage.critic_value[i].detach()
 
             storage.advantage[i] = advantages.detach()
-            storage.returns[i] = returns.detach()
+            storage.returns[i] = returns_of_next_state.detach()
 
         # calc the loss
         log_prob_a_tensor = torch.cat(storage.log_prob_a).squeeze()

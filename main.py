@@ -51,7 +51,6 @@ num_episodes = 100000
 
 
 def run_environment(brain_name, num_agents, agent_states, state_size, action_size):
-    scores = np.zeros(num_agents)                          # initialize the score (for each agent)
     agent = A2CAgent(env=env, brain_name=brain_name, state_size=state_size, action_size=action_size)
 
     for i_episode in range(1, num_episodes + 1):
@@ -67,7 +66,7 @@ def run_environment(brain_name, num_agents, agent_states, state_size, action_siz
         # evaluate every so often
         if i_episode%100 == 0:
             scores_window = agent.evaluate(agent_states)
-            print('\rEpisode {}\tAverage Score: {:.2f}'.format(i_episode, np.mean(scores_window)), end="\n")
+            print('\rEpisode {}\tAverage Score: {:.2f}'.format(i_episode, np.mean(scores_window)), end="\n ")
         else:
             print('\rEpisode {}'.format(i_episode), end="")
 

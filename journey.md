@@ -31,3 +31,16 @@ value_loss_weight = 1.0
 -> constant rewards of 0. I think the agent doesnt find good action to chose because the time to interact with the world is
 too small. + The std of the action distribution is 0, which might mess up the entropy, maybe a very small value is better.
 It might also be necessary to learn the std as well.
+
+## 2
+Hyper parameter tuning doesn't work at all. The agent seems not to learn anything. This means back to the drawing board
+and rethink the algorithm and search for bugs in the implementation.
+
+# Conclusion 1
+
+It seems that the training runs are not independent anymore. Therefore the learning of the critic is prone to
+divergence. It's better to use a replay buffer to iid sample the input data from experience just like in the
+banana project. Also: Exploration is not done correctly, according to (DDPG)[https://arxiv.org/pdf/1509.02971.pdf]
+there must be a noise term added to the action that is selected in order to also do other actions and explore more.
+Else it just takes for ever, which is exactly what can be seen by current experiments.
+

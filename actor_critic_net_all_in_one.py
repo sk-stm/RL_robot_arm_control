@@ -9,28 +9,32 @@ class ActorCriticNet(nn.Module):
         super(ActorCriticNet, self).__init__()
 
         self.actor_fc1 = nn.Linear(state_size, 64)
-        self.actor_fc2 = nn.Linear(64, 64)
-        self.actor_fc3 = nn.Linear(64, action_size)
+        self.actor_fc2 = nn.Linear(64, 128)
+        self.actor_fc3 = nn.Linear(128, 256)
+        self.actor_fc4 = nn.Linear(256, action_size)
 
         self.critic_fc1 = nn.Linear(state_size, 64)
-        self.critic_fc2 = nn.Linear(64, 64)
-        self.critic_fc3 = nn.Linear(64, 1)
+        self.critic_fc2 = nn.Linear(64, 128)
+        self.critic_fc3 = nn.Linear(128, 256)
+        self.critic_fc4 = nn.Linear(256, 1)
 
         # set std of action distribution
-        self.std = nn.Parameter(torch.zeros(action_size) + 1e-5)
+        self.std = nn.Parameter(torch.zeros(action_size) + 1e-3)
 
     def forward(self, state, action=None):
         # get mean of action distribution
         x_a = F.relu(self.actor_fc1(state))
         x_a = F.relu(self.actor_fc2(x_a))
-        mean_a = torch.tanh(self.actor_fc3(x_a))
+        x_a = F.relu(self.actor_fc3(x_a))
+        mean_a = torch.tanh(self.actor_fc4(x_a))
 
         #TODO currently only the mean is changed, one could also change the std with another head
 
         # get critics opinion on the state
         x_c = F.relu(self.critic_fc1(state))
         x_c = F.relu(self.critic_fc2(x_c))
-        critic_value = F.relu(self.critic_fc3(x_c))
+        x_c = F.relu(self.critic_fc3(x_c))
+        critic_value = F.relu(self.critic_fc4(x_c))
 
         action_distribution = torch.distributions.Normal(mean_a, F.softplus(self.std))
         if action is None:
