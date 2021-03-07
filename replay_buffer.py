@@ -30,10 +30,6 @@ class ReplayBuffer:
         e = self.experience(state, action, reward, next_state, done)
         self.memory.append(e)
 
-    # TODO maybe create a sample method according to importance
-    # https://arxiv.org/pdf/1511.05952.pdf
-    # https://paperswithcode.com/paper/prioritized-experience-replay
-
     def sample(self):
         """Randomly sample a batch of experiences from memory."""
         experiences = random.sample(self.memory, k=self.batch_size)

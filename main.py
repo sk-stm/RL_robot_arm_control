@@ -5,6 +5,7 @@ from unityagents import UnityEnvironment
 import numpy as np
 
 from a2c_agent import A2CAgent
+from ddpg_agent import DDPGAgent
 
 ENV_PATH = '/home/shinchan/Projekte/Reinforcement_learning/Udacity/project_1/deep-reinforcement-learning/p2_continuous-control/Reacher_Linux_single/Reacher.x86'
 env = UnityEnvironment(file_name=ENV_PATH)
@@ -50,8 +51,10 @@ def init_env():
 num_episodes = 100000
 
 
-def run_environment(brain_name, num_agents, agent_states, state_size, action_size):
-    agent = A2CAgent(env=env, brain_name=brain_name, state_size=state_size, action_size=action_size)
+def run_environment(brain_name, num_agents, agent_state, state_size, action_size):
+    #agent = A2CAgent(env=env, brain_name=brain_name, state_size=state_size, action_size=action_size)
+    agent = DDPGAgent(env=env, brain_name=brain_name, state_size=state_size, action_size=action_size)
+    scores_window = deque(maxlen=100)
 
     for i_episode in range(1, num_episodes + 1):
         # TODO save after so many steps
@@ -60,15 +63,42 @@ def run_environment(brain_name, num_agents, agent_states, state_size, action_siz
 
         # TODO break if too many steps taken
 
+        score = 0
         # teach the agent
-        agent.step(agent_states)
+        # reset environment
+        env_info = env.reset(train_mode=True)[brain_name]
+        # get first state
+        state = env_info.vector_observations[0]
+        agent.oup.reset_process()
+
+        # TODO make this a variable depending on the environment (episode length)
+        for i_times in range(1000):
+            action = agent.act(state)
+            # take action in environment
+            env_info = env.step(action)[brain_name]  # send all actions to tne environment
+            next_observed_state = env_info.vector_observations  # get next state (for each agent)
+
+            observed_reward = env_info.rewards  # get reward (for each agent)
+            # The reward given was always ~ 0.02 which is not what the environment description explained.
+            # So I changed it to 0.1 if it's greater than 0.
+            observed_reward = [0.1 if rew > 0 else 0 for rew in observed_reward]
+
+            done = env_info.local_done  # see if episode finished
+
+            agent.step(state, action, next_observed_state, observed_reward, done)
+            state = next_observed_state
+
+            score += observed_reward[0]
+            if done[0]:
+                break
+
+        scores_window.append(score)  # save most recent score
 
         # evaluate every so often
-        if i_episode%100 == 0:
-            scores_window = agent.evaluate(agent_states)
+        if i_episode%10 == 0:
             print('\rEpisode {}\tAverage Score: {:.2f}'.format(i_episode, np.mean(scores_window)), end="\n ")
         else:
-            print('\rEpisode {}'.format(i_episode), end="")
+            print('\rEpisode {}\tScor for this episode {:.2f}:'.format(i_episode, score), end="")
 
 
 if __name__ == "__main__":

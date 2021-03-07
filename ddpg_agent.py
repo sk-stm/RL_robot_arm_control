@@ -1,154 +1,128 @@
 import random
 from collections import deque
 
-from actor_critic_net_all_in_one import ActorCriticNet
 import torch.optim as optim
 import numpy as np
 import torch
+import torch.nn.functional as F
 
 from actor_critic_net_separate import ActorNet, CriticNet
-from prioritized_memory import PrioritizedReplayBuffer
+from ornstein_uhlenbeck_process import OrnsteinUhlenbeckProcess
 from replay_buffer import ReplayBuffer
-from storage import Storage
-import torch.nn as nn
 
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-number_of_actor_runs = 5
-num_workers = 1
-discount_factor = 0.999
-gradient_clip = 0.01
-entropy_weight = 0.001
-value_loss_weight = 1.0
-
-#memory
+GAMMA = 0.999
 BATCH_SIZE = 64
-PROBABILITY_EXPONENT = 0.8
-BUFFER_SIZE = int(1e4)
-GAMMA = 0.99
+BUFFER_SIZE = int(1e5)
+TAU = 1e-1
+LR_ACTOR = 1e-3
+LR_CRITIC = 3e-3
+WEIGHT_DECAY = 0.0001
+UPDATE_EVERY = 5
+NOISE_REDUCTION_FACTOR = 0.9999
 
 
 class DDPGAgent:
 
-    def __init__(self, env, brain_name, state_size, action_size, num_agents=1):
-        self.local_actor_network = ActorNet(state_size=state_size,
-                                            action_size=action_size).to(device)
-        self.target_actor_network = ActorNet(state_size=state_size,
-                                             action_size=action_size).to(device)
-        self.local_critic_network = CriticNet(state_size=state_size,
-                                              action_size=action_size).to(device)
-        self.target_critic_network = CriticNet(state_size=state_size,
-                                               action_size=action_size).to(device)
-        self.actor_optimizer = optim.Adam(self.local_actor_network.parameters(), lr=0.0003)
-        self.critic_optimizer = optim.Adam(self.local_critic_network.parameters(), lr=0.0003)
+    def __init__(self, env, brain_name, state_size, action_size):
+        self.local_actor_network = ActorNet(state_size=state_size, action_size=action_size).to(device)
+        self.target_actor_network = ActorNet(state_size=state_size, action_size=action_size).to(device)
+        self.actor_optimizer = optim.Adam(self.local_actor_network.parameters(), lr=LR_ACTOR)
 
-        self.env = env
-        self.num_agents = num_agents
-        self.action_size = action_size
-        self.brain_name = brain_name
+        self.local_critic_network = CriticNet(state_size=state_size, action_size=action_size).to(device)
+        self.target_critic_network = CriticNet(state_size=state_size, action_size=action_size).to(device)
+        self.critic_optimizer = optim.Adam(self.local_critic_network.parameters(), lr=LR_CRITIC, weight_decay=WEIGHT_DECAY)
+
         self.memory = ReplayBuffer(action_size, BUFFER_SIZE, BATCH_SIZE, random.seed(0))
 
-    def noise_process_for_exploration(self):
-        theta = 0.15
-        mu = 0
-        dt = 1e-2
-        # TODO write linear schedule
-        std = 0.2
-        return theta * mu * dt + std * np.sqrt(dt) * np.random.randn(*self.action_size)
+        self.oup = OrnsteinUhlenbeckProcess(action_size=action_size)
+        self.t_step = 0
+        self.noise_weight = 1
 
-    def step(self, states):
-        # run the actor
-        storage = Storage()
+    def act(self, state):
+        state_tensor = torch.from_numpy(state).float().to(device)
+        self.local_actor_network.eval()
+        with torch.no_grad():
+            action = self.local_actor_network(state_tensor)
+            action = action.cpu().detach().numpy()
 
+            self.noise_weight *= NOISE_REDUCTION_FACTOR
+            action += self.oup.sample()*self.noise_weight
+            action = np.clip(action, -1, 1)
+
+        self.local_actor_network.train()
+
+        return action
+
+    def step(self, state, action, next_observed_state, observed_reward, done):
         # N-step TD error
         #for i in range(number_of_actor_runs):
-        #actions = np.random.randn(self.num_agents, self.action_size)  # select an action (for each agent)
-        #actions = np.clip(actions, -1, 1)  # all actions between -1 and 1
 
-        # get action from actor network
-        state_tensor = torch.from_numpy(states).float().to(device)
-        prediction = self.local_network(state_tensor)
-        action = prediction['action'].cpu().detach().numpy()
-        action += self.noise_process_for_exploration()
+        done_value = int(done[0] == True)
+        self.memory.add(state, action, observed_reward, next_observed_state, done_value)
 
-        # take action in environment
-        env_info = self.env.step(action)[self.brain_name]  # send all actions to tne environment
-        next_states = env_info.vector_observations  # get next state (for each agent)
-        reward = env_info.rewards  # get reward (for each agent)
-        done = env_info.local_done  # see if episode finished
+        self.t_step = (self.t_step + 1) % UPDATE_EVERY
+        if self.t_step == 0:
 
-        # put all in storage
-        storage.action.append(action)
-        storage.critic_value.append(prediction['critic_value'])
+            if len(self.memory) > BATCH_SIZE:
+                experiences = self.memory.sample()
+                self.learn(experiences)
 
-        # needs to be a pytorch tensor just like everything else
-        done_value = 1 - int(done is True)
-        storage.done.append(torch.from_numpy(np.array(done_value)).to(device))
-        storage.entropy.append(prediction['entropy'])
-        storage.log_prob_a.append(prediction['log_prob_a'])
-        storage.mean_a.append(prediction['mean_a'])
+    def learn(self, experiences):
 
-        # needs to be a pytorch tensor just like everything else
-        storage.reward.append(torch.from_numpy(np.array(reward)).to(device))
+        state, actions, rewards, next_state, dones = experiences
 
-        # init advantage and return values in storage
-        storage.advantage.append(None)
-        storage.returns.append(None)
+        # run target actor to get next best action
+        next_target_action = self.target_actor_network(next_state)
+        next_state_value = self.target_critic_network(next_state, next_target_action)
+        target_critic_value_for_next_state = rewards + GAMMA * (1-dones) * next_state_value
 
-        self.memory.add(states, action, reward, next_states, done)
+        # TODO this detach is maybe not needed because the target network is never optimized
+        #target_critic_value_for_next_state = target_critic_value_for_next_state.detach()
 
-        if done[0]:  # exit loop if episode finished
-            #break
-            return
+        local_value_current_state = self.local_critic_network(state, actions)
 
-        if len(self.memory) > BATCH_SIZE:
-            experiences = self.memory.sample()
+        # important to put a - in front because optimizer will do gradient decent
+        critic_loss = F.mse_loss(local_value_current_state, target_critic_value_for_next_state)
 
-            states, actions, rewards, next_states, dones = experiences
+        self.local_critic_network.zero_grad()
+        critic_loss.backward()
+        self.critic_optimizer.step()
 
-            # run actor once more
-            state_tensor = torch.from_numpy(states).float().to(device)
-            next_action = self.target_actor_network(state_tensor)
+        action = self.local_actor_network(state)
+        #policy_loss = -self.local_critic_network(state.detach(), action).mean()
+        policy_loss = -self.local_critic_network(state, action).mean()
 
-            # TODO ab hier gehts weiter
-            # reverse fill advantage and return
-            #for i in reversed(range(number_of_actor_runs)):
-            for i in reversed(range(len(storage.action))):
-                critic_value_for_next_state = storage.reward[i] + discount_factor * storage.done[i] * critic_value_for_next_state
-                advantages = critic_value_for_next_state - storage.critic_value[i].detach()
+        self.local_actor_network.zero_grad()
+        policy_loss.backward()
+        self.actor_optimizer.step()
 
-                storage.advantage[i] = advantages.detach()
-                storage.returns[i] = critic_value_for_next_state.detach()
+        self.soft_update(self.local_actor_network, self.target_actor_network, TAU)
+        self.soft_update(self.local_critic_network, self.target_critic_network, TAU)
 
-            # calc the loss
-            log_prob_a_tensor = torch.cat(storage.log_prob_a).squeeze()
-            advantage_tensor = torch.cat(storage.advantage).squeeze()
-            policy_loss = -(log_prob_a_tensor * advantage_tensor).mean()
+    def soft_update(self, local_model, target_model, tau):
+        """
+        Soft update model parameters.
+        θ_target = τ*θ_local + (1 - τ)*θ_target
 
-            return_tensor = torch.cat(storage.returns).squeeze()
-            critic_value_tensor = torch.cat(storage.critic_value).squeeze()
-            value_loss = 0.5 * (return_tensor - critic_value_tensor).pow(2).mean()
-
-            entropy_tensor = torch.cat(storage.entropy).squeeze()
-            entropy_loss = entropy_tensor.mean()
-
-            self.optimizer.zero_grad()
-            (policy_loss + entropy_weight * entropy_loss + value_loss_weight * value_loss).backward()
-            nn.utils.clip_grad_norm(self.network.parameters(), gradient_clip)
-            self.optimizer.step()
+        :param local_model: (PyTorch model) weights will be copied from
+        :param target_model: (PyTorch model) weights will be copied to
+        :param tau: (float) interpolation parameter
+        """
+        for target_param, local_param in zip(target_model.parameters(), local_model.parameters()):
+            target_param.data.copy_(tau * local_param.data + (1.0 - tau) * target_param.data)
 
     def evaluate(self, states):
         scores_window = deque(maxlen=100)
 
         for i in range(100):
-            #actions = np.random.randn(self.num_agents, self.action_size)  # select an action (for each agent)
-            #actions = np.clip(actions, -1, 1)  # all actions between -1 and 1
 
             # get action from actor network
             state_tensor = torch.from_numpy(states).float().to(device)
-            prediction = self.network(state_tensor)
-            action = prediction['action'].cpu().detach().numpy()
+            action = self.target_actor_network(state_tensor)
+            action = action.cpu().detach().numpy()
 
             # take action in environment
             env_info = self.env.step(action)[self.brain_name]  # send all actions to tne environment
