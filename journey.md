@@ -146,3 +146,45 @@ UPDATE_EVERY = 10
 std = 0.1
 
 -> Episode 1370	Average Score: 0.41; still not converging
+
+## Exp 9
+GAMMA = 0.999
+BATCH_SIZE = 64
+BUFFER_SIZE = int(1e5)
+TAU = 1e-1
+LR_ACTOR = 1e-3
+LR_CRITIC = 3e-3
+WEIGHT_DECAY = 0.0001
+UPDATE_EVERY = 5
+NOISE_REDUCTION_FACTOR = 0.9999
+
+-> no converge
+
+## Exp 10
+GAMMA = 0.99
+BATCH_SIZE = 64
+BUFFER_SIZE = int(1e5)
+TAU = 1e-1
+LR_ACTOR = 1e-3
+LR_CRITIC = 3e-3
+WEIGHT_DECAY = 0.0001
+UPDATE_EVERY = 5
+NOISE_REDUCTION_FACTOR = 0.9999
+
+-> diverged
+
+## Exp 11
+GAMMA = 0.99
+BATCH_SIZE = 64
+BUFFER_SIZE = int(1e5)
+TAU = 1e-1
+LR_ACTOR = 5e-4
+LR_CRITIC = 5e-4
+WEIGHT_DECAY = 0.0001
+UPDATE_EVERY = 5
+NOISE_REDUCTION_FACTOR = 0.9999
+theta = 0.15
+mu = 0
+sigma = 0.1
+
+-> works! now let's wait

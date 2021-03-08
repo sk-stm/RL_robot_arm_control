@@ -1,0 +1,20 @@
+import torch
+
+# LEARNING PARAMETERS
+GAMMA = 0.99
+BATCH_SIZE = 64
+BUFFER_SIZE = int(1e5)
+TAU = 1e-1
+LR_ACTOR = 5e-4
+LR_CRITIC = 5e-4
+WEIGHT_DECAY = 0.0001
+UPDATE_EVERY = 5
+
+# NOISE PARAMETERS
+NOISE_REDUCTION_FACTOR = 0.9999
+THETA = 0.15
+MU = 0
+SIGMA = 0.1
+
+# DEVICE PARAMETERS
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")

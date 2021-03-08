@@ -1,4 +1,5 @@
 import numpy as np
+from PARAMETERS import THETA, MU, SIGMA
 
 
 class OrnsteinUhlenbeckProcess:
@@ -8,11 +9,7 @@ class OrnsteinUhlenbeckProcess:
         self.action_size = action_size
 
     def sample(self):
-        theta = 0.15
-        mu = 0
-        # TODO write linear schedule
-        std = 0.1
-        x = self.prev_x + theta * (mu + self.prev_x) + std * np.random.randn(*(self.action_size,))
+        x = self.prev_x + THETA * (MU + self.prev_x) + SIGMA * np.random.randn(*(self.action_size,))
         self.prev_x = x
         return x
 
