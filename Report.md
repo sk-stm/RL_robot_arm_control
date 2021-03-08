@@ -96,15 +96,14 @@ SIGMA = 0.1
  Therefore the noise encourage random exploration of actions at the start and use the best actions later during the
  training.
 
-The rewards received by an agent of this type can be shown in this figure:
-# TODO
-![Best performance over all](DQN/best_model_overall/score_plot_1992.jpg)
+The rewards received by my best agent of this type can be shown in this figure:
 
-# TODO
-This agent was trained 2000 episodes and reached an average reward of 15.39.
+![Best performance over all](DDPG/best_model/score_plot_1678.jpg)
+This agent was trained 1678 episodes and reached an average reward of 97.0.
 
 The reward > 30 was achieved after 1110 episodes. The next figure shows the learning process of that agent.
-![Earlies solution to the environment](file:///home/shinchan/Projekte/Reinforcement_learning/Udacity/project_1/deep-reinforcement-learning/p2_continuous-control/RL_robot_arm_control/DDPG/2021_03_08_15_32_53/score_plot_1110.jpg)
+
+![Earlies solution to the environment](DDPG/earliest_model/score_plot_1110.jpg)
 
 # Future ideas to improve performance
 To improve the performance and make the agent train faster, one could tune the parameters a little bit more. It's clear
@@ -121,8 +120,8 @@ promising according to [this paper](https://arxiv.org/pdf/1604.06778.pdf).
  One could also apply prioritized experience replay which should make more the agent learn more efficiently in the
  regions it's unsure yet. And therefore contribute to a faster convergence.
 
-# Best performace parameters for DQN:
-# LEARNING PARAMETERS
+# Best performace parameters for DDPG:
+### LEARNING PARAMETERS
 GAMMA = 0.99
 BATCH_SIZE = 64
 BUFFER_SIZE = int(1e5)
@@ -132,7 +131,7 @@ LR_CRITIC = 5e-4
 WEIGHT_DECAY = 0.0001
 UPDATE_EVERY = 5
 
-# NOISE PARAMETERS
+### NOISE PARAMETERS
 NOISE_REDUCTION_FACTOR = 0.9999
 THETA = 0.15
 MU = 0

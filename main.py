@@ -14,10 +14,10 @@ from a2c_agent import A2CAgent
 from actor_critic_net_separate import ActorNet
 from ddpg_agent import DDPGAgent
 
-ENV_PATH = '/home/shinchan/Projekte/Reinforcement_learning/Udacity/project_1/deep-reinforcement-learning/p2_continuous-control/Reacher_Linux_single/Reacher.x86'
+ENV_PATH = '../Reacher_Linux_single/Reacher.x86'
 env = UnityEnvironment(file_name=ENV_PATH)
-TRAIN_MODE = True
-MODEL_TO_LOAD = '/home/shinchan/Projekte/Reinforcement_learning/Udacity/project_1/deep-reinforcement-learning/p2_continuous-control/RL_robot_arm_control/DDPG/2021_03_08_12_58_06/checkpoint_19.95.pth'
+TRAIN_MODE = False
+MODEL_TO_LOAD = 'DDPG/best_model/checkpoint_97.0.pth'
 
 
 def main():
