@@ -27,6 +27,9 @@ share/python-wheels/
 *.egg
 MANIFEST
 .idea/
+DDPG/20*
+A2C/20*
+score_plot_*
 
 # PyInstaller
 #  Usually these files are written by a python script from a template

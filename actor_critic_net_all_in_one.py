@@ -2,10 +2,9 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 
-
 class ActorCriticNet(nn.Module):
 
-    def __init__(self, state_size, action_size):
+    def __init__(self, state_size, action_size, noise):
         super(ActorCriticNet, self).__init__()
 
         self.actor_fc1 = nn.Linear(state_size, 64)
@@ -19,7 +18,7 @@ class ActorCriticNet(nn.Module):
         self.critic_fc4 = nn.Linear(256, 1)
 
         # set std of action distribution
-        self.std = nn.Parameter(torch.zeros(action_size) + 1e-3)
+        self.std = nn.Parameter(torch.zeros(action_size) + noise)
 
     def forward(self, state, action=None):
         # get mean of action distribution
@@ -34,7 +33,7 @@ class ActorCriticNet(nn.Module):
         x_c = F.relu(self.critic_fc1(state))
         x_c = F.relu(self.critic_fc2(x_c))
         x_c = F.relu(self.critic_fc3(x_c))
-        critic_value = F.relu(self.critic_fc4(x_c))
+        critic_value = self.critic_fc4(x_c)
 
         action_distribution = torch.distributions.Normal(mean_a, F.softplus(self.std))
         if action is None:

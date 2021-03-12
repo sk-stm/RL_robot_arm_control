@@ -11,36 +11,54 @@ import torch
 from PARAMETERS import device
 
 from a2c_agent import A2CAgent
+from actor_critic_net_all_in_one import ActorCriticNet
 from actor_critic_net_separate import ActorNet
 from ddpg_agent import DDPGAgent
 
-ENV_PATH = '../Reacher_Linux_single/Reacher.x86'
+
+#ENV_PATH = '../Reacher_Linux_single/Reacher.x86'
+#MODEL_TO_LOAD = 'DDPG/best_model/checkpoint_97.0.pth'
+
+#ENV_PATH = '../Reacher_Linux_multi/Reacher.x86'
+#MODEL_TO_LOAD = 'A2C/earliest_model/checkpoint_30.64.pth'
+
+ENV_PATH = '../Crawler_Linux/Crawler.x86'
+MODEL_TO_LOAD = 'None'
+
 env = UnityEnvironment(file_name=ENV_PATH)
-TRAIN_MODE = False
-MODEL_TO_LOAD = 'DDPG/best_model/checkpoint_97.0.pth'
+TRAIN_MODE = True
 
 
 def main():
     brain_name, num_agents, agent_states, state_size, action_size = init_env()
 
-    # agent = A2CAgent(env=env, brain_name=brain_name, state_size=state_size, action_size=action_size)
-    agent = DDPGAgent(state_size=state_size, action_size=action_size)
-
+    if TRAIN_MODE:
+        # agent = DDPGAgent(state_size=state_size, action_size=action_size)
+        agent = A2CAgent(state_size=state_size, action_size=action_size, num_agents=num_agents)
     if not TRAIN_MODE:
-        load_model_into_agent(agent, state_size, action_size)
+        # agent = DDPGAgent(state_size=state_size, action_size=action_size)
+        # load_model_into_DDPG_agent(agent, state_size, action_size)
+        agent = A2CAgent(state_size=state_size, action_size=action_size, num_agents=num_agents)
+        load_model_into_A2C_agent(agent=agent, state_size=state_size, action_size=action_size)
 
     run_environment(brain_name, agent)
 
     env.close()
 
 
-def load_model_into_agent(agent, state_size, action_size):
+def load_model_into_DDPG_agent(agent, state_size, action_size):
     """
     Loads a pretrained network into the created agent.
     """
     actor_network = ActorNet(state_size=state_size, action_size=action_size).to(device)
     actor_network.load_state_dict(torch.load(MODEL_TO_LOAD))
     agent.local_actor_network = actor_network
+
+
+def load_model_into_A2C_agent(agent, state_size, action_size):
+    network = ActorCriticNet(state_size=state_size, action_size=action_size, noise=0).to(device)
+    network.load_state_dict(torch.load(MODEL_TO_LOAD))
+    agent.network = network
 
 
 def init_env():
@@ -94,29 +112,56 @@ def run_environment(brain_name, agent):
         score = 0
         # get first state of environment
         env_info = env.reset(train_mode=TRAIN_MODE)[brain_name]
-        state = env_info.vector_observations[0]
-        agent.oup.reset_process()
+        # TODO make this nice
+        if type(agent) == DDPGAgent:
+            state = env_info.vector_observations[0]
+            agent.oup.reset_process()
+        else:
+            state = env_info.vector_observations
 
         # TODO make this a variable depending on the environment (episode length)
-        for i_times in range(1000):
+        # reacher
+        #for i_times in range(1000):
+        # crawler
+        for i_times in range(10000):
             # take action in environment and get its response
-            action = agent.act(state, add_noise=TRAIN_MODE)
+            # TODO make this nice
+            if type(agent) == DDPGAgent:
+                action = agent.act(state, add_noise=TRAIN_MODE)
+            elif type(agent) == A2CAgent:
+                prediction = agent.act(state)
+                action = prediction['action'].cpu().detach().numpy()
+            else:
+                raise NotImplementedError
+
             env_info = env.step(action)[brain_name]
             next_observed_state = env_info.vector_observations
             observed_reward = env_info.rewards
             # The reward given was always ~ 0.02 which is not what the environment description explained.
             # So I changed it to 0.1 if it's greater than 0. Also stated in the Udacity peer chat:
             # https://hub.udacity.com/rooms/community:nd893:845401-project-503-smg-2?contextType=room
-            observed_reward = [0.1 if rew > 0 else 0 for rew in observed_reward]
             done = env_info.local_done
 
             if TRAIN_MODE:
-                agent.step(state, action, next_observed_state, observed_reward, done)
+                if type(agent) == DDPGAgent:
+                    # TODO make this reward correction evironment specific
+                    #observed_reward = [0.1 if rew > 0 else 0 for rew in observed_reward]
+                    agent.step(state, action, next_observed_state, observed_reward, done)
+                    score += observed_reward[0]
+                elif type(agent) == A2CAgent:
+                    # TODO make this reward correction evironment specific
+                    #observed_reward = [0.1 if rew > 0 else 0 for rew in observed_reward]
+                    agent.step(state, prediction, observed_reward, done)
+
+                    score += np.mean(observed_reward)
+                else:
+                    raise NotImplementedError
 
             state = next_observed_state
 
-            score += observed_reward[0]
-            if done[0]:
+            #if done[0]:
+            #    break
+            if np.any(done):
                 break
 
         # save the obtained scores
@@ -154,13 +199,20 @@ def plot_and_save_agent(agent, i_episode, score_max, scores, scores_mean, score)
     if i_episode % 100 == 0 and TRAIN_MODE:
         print('\nEpisode {}\tAverage Score: {:.2f}'.format(i_episode, scores_mean), end="")
         save_score_plot(scores, i_episode)
-    if scores_mean >= 20.0 and scores_mean > score_max and TRAIN_MODE:
-        save_current_agent(agent, score_max, scores, i_episode)
-        # TODO save replay buffer parameters as well if prioritized replay buffer was used
+        # TODO make score for solving environment depedndin on environment
+    if scores_mean >= 2000.0 and scores_mean > score_max and TRAIN_MODE:
+        if type(agent) == DDPGAgent:
+            save_current_DDPG_agent(agent, score_max, scores, i_episode)
+        elif type(agent) == A2CAgent:
+            save_current_A2C_agent(agent, score_max, scores, i_episode)
+        else:
+            raise NotImplementedError
+
+            # TODO save replay buffer parameters as well if prioritized replay buffer was used
         print('\nEnvironment solved in {:d} episodes!\tAverage Score: {:.2f} '.format(i_episode - 100, scores_mean))
 
 
-def save_current_agent(agent, score_max, scores, i_episode):
+def save_current_DDPG_agent(agent, score_max, scores, i_episode):
     """
     Saves the current agent.
 
@@ -178,6 +230,23 @@ def save_current_agent(agent, score_max, scores, i_episode):
     shutil.copyfile("PARAMETERS.py", os.path.join(new_folder_path, "PARAMETERS.py"))
 
 
+def save_current_A2C_agent(agent, score_max, scores, i_episode):
+    """
+    Saves the current agent.
+
+    :param agent:       agent to saved
+    :param score_max:   max_score reached by the agent so far
+    :param scores:      all scores of the agent reached so far
+    :param i_episode:   number of current episode
+    """
+    new_folder_path = create_folder_structure_according_to_agent(agent)
+
+    os.makedirs(new_folder_path, exist_ok=True)
+    torch.save(agent.network.state_dict(),
+               os.path.join(new_folder_path, f'checkpoint_{np.round(score_max, 2)}.pth'))
+    save_score_plot(scores, i_episode, path=new_folder_path)
+    shutil.copyfile("PARAMETERS.py", os.path.join(new_folder_path, "PARAMETERS.py"))
+
 def create_folder_structure_according_to_agent(agent):
     """
     Creates a folder structure to store the current experiment according to the type of agent that was run and the
@@ -190,7 +259,7 @@ def create_folder_structure_according_to_agent(agent):
     if type(agent) == DDPGAgent:
         new_folder_path = os.path.join('DDPG', f'{date_str}')
     else:
-        raise NotImplementedError()
+        new_folder_path = os.path.join('A2C_crawler', f'{date_str}')
     return new_folder_path
 
 

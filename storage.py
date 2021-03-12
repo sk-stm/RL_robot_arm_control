@@ -10,3 +10,14 @@ class Storage:
         self.done = []
         self.advantage = []
         self.returns = []
+
+    def empty(self):
+        self.action.clear()
+        self.log_prob_a.clear()
+        self.entropy.clear()
+        self.mean_a.clear()
+        self.critic_value.clear()
+        self.reward.clear()
+        self.done.clear()
+        self.advantage.clear()
+        self.returns.clear()
