@@ -1,5 +1,6 @@
+import os
 import random
-from collections import deque
+import shutil
 
 import torch.optim as optim
 import numpy as np
@@ -7,20 +8,23 @@ import torch
 import torch.nn.functional as F
 
 from actor_critic_net_separate import ActorNet, CriticNet
+from environment import device
 from ornstein_uhlenbeck_process import OrnsteinUhlenbeckProcess
 from replay_buffer import ReplayBuffer
-from PARAMETERS import LR_ACTOR, LR_CRITIC, device, WEIGHT_DECAY, BUFFER_SIZE, BATCH_SIZE, NOISE_REDUCTION_FACTOR, UPDATE_EVERY, GAMMA, TAU
+from DDPG_PARAMETERS import LR_ACTOR, LR_CRITIC, WEIGHT_DECAY, BUFFER_SIZE, BATCH_SIZE, NOISE_REDUCTION_FACTOR, UPDATE_EVERY, GAMMA, TAU
+from save_and_plot import create_folder_structure_according_to_agent, save_score_plot
 
 
 class DDPGAgent:
 
-    def __init__(self, state_size, action_size):
+    def __init__(self, state_size, action_size, num_agents=1):
         """
         Initializes the agent with local and target networks for the actor and the critic.
 
         :param state_size:  dimensionality of the state space
         :param action_size: dimensionality of the action space
         """
+        self.num_agents = num_agents
         # define actor networks
         self.local_actor_network = ActorNet(state_size=state_size, action_size=action_size).to(device)
         self.target_actor_network = ActorNet(state_size=state_size, action_size=action_size).to(device)
@@ -144,3 +148,26 @@ class DDPGAgent:
         """
         for target_param, local_param in zip(target_model.parameters(), local_model.parameters()):
             target_param.data.copy_(tau * local_param.data + (1.0 - tau) * target_param.data)
+
+    def load_model_into_DDPG_agent(self, model_path):
+        """
+        Loads a pretrained network into the created agent.
+        """
+        self.local_actor_network.load_state_dict(torch.load(model_path))
+
+    def save_current_agent(self, score_max, scores, i_episode):
+        """
+        Saves the current agent.
+
+        :param agent:       agent to saved
+        :param score_max:   max_score reached by the agent so far
+        :param scores:      all scores of the agent reached so far
+        :param i_episode:   number of current episode
+        """
+        new_folder_path = create_folder_structure_according_to_agent()
+
+        os.makedirs(new_folder_path, exist_ok=True)
+        torch.save(self.local_actor_network.state_dict(),
+                   os.path.join(new_folder_path, f'checkpoint_{np.round(score_max, 2)}.pth'))
+        save_score_plot(scores, i_episode, path=new_folder_path)
+        shutil.copyfile("DDPG_PARAMETERS.py", os.path.join(new_folder_path, "DDPG_PARAMETERS.py"))

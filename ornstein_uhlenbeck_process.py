@@ -1,5 +1,5 @@
 import numpy as np
-from PARAMETERS import THETA, MU, SIGMA
+from DDPG_PARAMETERS import THETA, MU, SIGMA
 
 
 class OrnsteinUhlenbeckProcess:

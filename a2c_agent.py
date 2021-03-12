@@ -1,18 +1,25 @@
+import os
+import shutil
+
 from actor_critic_net_all_in_one import ActorCriticNet
 import torch.optim as optim
 import numpy as np
 import torch
+
+from environment import device
+from save_and_plot import create_folder_structure_according_to_agent, save_score_plot
 from storage import Storage
 import torch.nn as nn
-from PARAMETERS import device, UPDATE_EVERY, GAMMA, ENTROPY_WEIGHT, VALUE_LOS_WEIGHT, GRADIENT_CLIP, NOISE_REDUCTION_FACTOR
+from A3C_PARAMETERS import ACTIONS_BETWEEN_LEARNING, GAMMA, ENTROPY_WEIGHT, VALUE_LOS_WEIGHT, GRADIENT_CLIP, NOISE_REDUCTION_FACTOR, \
+    NOISE_ON_THE_ACTIONS
 
 
-class A2CAgent:
+class A3CAgent:
 
     def __init__(self, state_size, action_size, num_agents=1, ):
         self.network = ActorCriticNet(state_size=state_size,
                                       action_size=action_size,
-                                      noise=1e-3).to(device)
+                                      noise=NOISE_ON_THE_ACTIONS).to(device)
         self.optimizer = optim.Adam(self.network.parameters(), lr=0.0003)
         self.num_agents = num_agents
         self.action_size = action_size
@@ -27,15 +34,8 @@ class A2CAgent:
         :param add_noise:   if True, will add noise to an action given by the Ornstein-Uhlenbeck-Process
         :return:            chosen action
         """
-        # important to NOT create a gradient here because it's done later during learning and doing it twice corrupts
-        # the gradients
         state_tensor = torch.from_numpy(state).float().to(device)
-        #self.network.eval()
-        #with torch.no_grad():
         prediction = self.network(state_tensor)
-
-        # change the network back to training mode to train it during the learning step
-        #self.network.train()
 
         return prediction
 
@@ -53,7 +53,7 @@ class A2CAgent:
         self.storage.advantage.append(None)
         self.storage.returns.append(None)
 
-        self.t_step = (self.t_step + 1) % UPDATE_EVERY
+        self.t_step = (self.t_step + 1) % ACTIONS_BETWEEN_LEARNING
         if self.t_step == 0:
             self.learn(state)
 
@@ -62,13 +62,13 @@ class A2CAgent:
         state_tensor = torch.from_numpy(state).float().to(device)
         prediction = self.network(state_tensor)
 
-        #TODO reduce noise to the network std factor
+        # reduce noise to the network std factor
+        self.network.std *= NOISE_REDUCTION_FACTOR
 
         returns_of_next_state = prediction['critic_value'].squeeze().detach()
 
         # reverse fill advantage and return
-        #for i in reversed(range(number_of_actor_runs)):
-        for i in reversed(range(UPDATE_EVERY)):
+        for i in reversed(range(ACTIONS_BETWEEN_LEARNING)):
             returns_of_next_state = self.storage.reward[i] + GAMMA * self.storage.done[i] * returns_of_next_state
             advantages = returns_of_next_state - self.storage.critic_value[i].squeeze().detach()
 
@@ -94,3 +94,23 @@ class A2CAgent:
 
         # empty storage
         self.storage.empty()
+
+    def load_model_into_A2C_agent(self, model_path):
+        self.network.load_state_dict(torch.load(model_path))
+
+    def save_current_agent(self, score_max, scores, i_episode):
+        """
+        Saves the current agent.
+
+        :param agent:       agent to saved
+        :param score_max:   max_score reached by the agent so far
+        :param scores:      all scores of the agent reached so far
+        :param i_episode:   number of current episode
+        """
+        new_folder_path = create_folder_structure_according_to_agent()
+
+        os.makedirs(new_folder_path, exist_ok=True)
+        torch.save(self.network.state_dict(),
+                   os.path.join(new_folder_path, f'checkpoint_{np.round(score_max, 2)}.pth'))
+        save_score_plot(scores, i_episode, path=new_folder_path)
+        shutil.copyfile("A3C_PARAMETERS.py", os.path.join(new_folder_path, "A3C_PARAMETERS.py"))
