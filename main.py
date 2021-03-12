@@ -81,6 +81,7 @@ def run_environment(brain_name, agent):
     scores_window = deque(maxlen=100)
     score_max = 0
     scores = []
+    saved_earliest_agent = False
 
     for i_episode in range(1, num_episodes + 1):
         score = 0
@@ -137,7 +138,7 @@ def run_environment(brain_name, agent):
         scores.append(score)
         score_mean = np.mean(scores_window)
 
-        score_max = plot_and_save_agent(agent, i_episode, score_max, scores, score_mean, score)
+        score_max, saved_earliest_agent = plot_and_save_agent(agent, i_episode, score_max, scores, score_mean, score, saved_earliest_agent)
 
 
 def train_agent(action, agent, done, next_observed_state, observed_reward, prediction, state):
@@ -179,7 +180,7 @@ def act_in_environment(agent, state):
     return action, prediction
 
 
-def plot_and_save_agent(agent, i_episode, score_max, scores, scores_mean, score):
+def plot_and_save_agent(agent, i_episode, score_max, scores, scores_mean, score, saved_earliest_agent):
     """
     Plots and saves the agent each 100th episode.
     Saves the agent, the current scores, the episode number, the trained parameters of the NN model and the hyper
@@ -204,16 +205,17 @@ def plot_and_save_agent(agent, i_episode, score_max, scores, scores_mean, score)
         print('\nEpisode {}\tAverage Score: {:.2f}'.format(i_episode, scores_mean), end="")
         save_score_plot(scores, i_episode)
 
-    if scores_mean >= score_max + SAVE_EACH_NEXT_BEST_REWARD:
+    if scores_mean >= score_max + SAVE_EACH_NEXT_BEST_REWARD and TRAIN_MODE:
         agent.save_current_agent(score_max, scores, i_episode)
         score_max += SAVE_EACH_NEXT_BEST_REWARD
         print('\nSaved agent with reward: {:.2f}\t after {:d} episodes!'.format(scores_mean, i_episode - 100))
 
-    if scores_mean >= NEEDED_REWARD_FOR_SOLVING_ENV and scores_mean > score_max and TRAIN_MODE:
+    if scores_mean >= NEEDED_REWARD_FOR_SOLVING_ENV and TRAIN_MODE and not saved_earliest_agent:
         agent.save_current_agent(score_max, scores, i_episode)
+        saved_earliest_agent = True
         print('\nEnvironment solved in {:d} episodes!\tAverage Score: {:.2f} '.format(i_episode - 100, scores_mean))
 
-    return score_max
+    return score_max, saved_earliest_agent
 
 
 if __name__ == "__main__":
