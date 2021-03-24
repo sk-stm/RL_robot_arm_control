@@ -42,8 +42,15 @@ The environment is considered solved if the agent get an **average reward of >=3
 
 ## Run training:
 1. Set the `TRAIN_MODE` variable in `main.py` to `True`
-2. Run main.py and the agent start training in the environment.
+2. Set `LOAD_MODEL = False` in `main.py` if you want to start training from scratch
+3. In `environment.py` uncomment the environment specific block of code you want to run
+    1. If `LOAD_MODEL == True`, set the path to the network parameters you want to load to the varaible
+    `MODEL_TO_LOAD` in `environment.py`.
+4. Run main.py and the agent start training in the environment.
 
 ## Run inference:
 1. Set the `TRAIN_MODE` variable in `main.py` to `False`
-2. Run main.py and the agent start training in the environment.
+2. Set `LOAD_MODEL = False` in `main.py`
+3. In `environment.py` uncomment the environment specific block of code you want to run
+4. In `environment.py` set the path to the network parameters you want to load in the `MODEL_TO_LOAD` variable.
+5. Run main.py and the agent start training in the environment.

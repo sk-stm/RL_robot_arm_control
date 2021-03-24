@@ -104,6 +104,8 @@ def run_environment(brain_name, agent):
             # take action in environment and get its response
             action, prediction = act_in_environment(agent, state)
 
+            action = np.clip(action, -1, 1)
+
             env_info = env.step(action)[brain_name]
             next_observed_state = env_info.vector_observations
             done = env_info.local_done

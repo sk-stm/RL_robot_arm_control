@@ -13,7 +13,7 @@ import torch
 # NEEDED_REWARD_FOR_SOLVING_ENV = 30
 
 ENV_PATH = '../Crawler_Linux/Crawler.x86'
-MODEL_TO_LOAD = '/home/shinchan/Projekte/Reinforcement_learning/Udacity/project_1/deep-reinforcement-learning/p2_continuous-control/RL_robot_arm_control/A3C_CRAWLER/2021_03_24_00_21_50/checkpoint_300.pth'
+MODEL_TO_LOAD = 'A3C_CRAWLER/2021_03_24_00_21_50/checkpoint_300.pth'
 AGENT_TYPE = 'A3C'
 ENV_NAME = 'CRAWLER'
 NEEDED_REWARD_FOR_SOLVING_ENV = 2000
