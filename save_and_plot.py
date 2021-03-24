@@ -19,7 +19,7 @@ def create_folder_structure_according_to_agent():
     return new_folder_path
 
 
-def save_score_plot(scores: List, i_episode: int, path: str = ""):
+def save_score_plot(scores: List, score_mean_list: int, i_episode: int, path: str = ""):
     """
     Saves a plot of numbers to a folder path. The The i_episode number is added to the name of the file.
 
@@ -29,6 +29,7 @@ def save_score_plot(scores: List, i_episode: int, path: str = ""):
     """
     fig = plt.figure()
     plt.plot(np.arange(len(scores)), scores)
+    plt.plot(np.arange(len(score_mean_list)), score_mean_list, 'C1')
     plt.ylabel('Score')
     plt.xlabel('Episode #')
     plt.savefig(os.path.join(path, f'score_plot_{i_episode}.jpg'))

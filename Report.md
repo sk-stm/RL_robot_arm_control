@@ -120,6 +120,16 @@ promising according to [this paper](https://arxiv.org/pdf/1604.06778.pdf).
  One could also apply prioritized experience replay which should make more the agent learn more efficiently in the
  regions it's unsure yet. And therefore contribute to a faster convergence.
 
+## Note on future ideas
+As time passed by I also implemented a A3C version for the multi-reacher environment. I observed that this algorithm converged
+a lot faster. This is because the environment states can be explored much quicker with 20 robot arms then with one. Where
+with 1 arm one has to take into account that the samples from the environment are biased or sequenced around the current
+state of the agent, with 20 arms these samples are more uniformly distributed. Therefore one doesn't need a replay buffer
+to sample uniformly from. The exploration is easily set with only one noise parameter and also the memory overhead is a bit
+smaller. All in all this method works faster, more reliable and is easier to tune then the simgle arm environment with DDPG.
+I can recommend solving the reacher problem with the multi arm environment and A3C instead of with the single arm environment
+and DDPG.
+
 # Best performace parameters for DDPG:
 ### LEARNING PARAMETERS
 GAMMA = 0.99

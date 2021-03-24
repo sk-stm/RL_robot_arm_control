@@ -3,35 +3,30 @@ from unityagents import UnityEnvironment
 import numpy as np
 
 from ddpg_agent import DDPGAgent
-from a2c_agent import A3CAgent
+from a3c_agent import A3CAgent
 
 from environment import ENV_PATH, MODEL_TO_LOAD, AGENT_TYPE, ENV_NAME, NEEDED_REWARD_FOR_SOLVING_ENV, SAVE_EACH_NEXT_BEST_REWARD
 from save_and_plot import save_score_plot
 
 env = UnityEnvironment(file_name=ENV_PATH)
 TRAIN_MODE = True
-num_episodes = 100000
+LOAD_MODEL = False
+num_episodes = 2000000
 
 
 def main():
     brain_name, num_agents, agent_states, state_size, action_size = init_env()
 
-    if TRAIN_MODE:
-        if AGENT_TYPE == 'DDPG':
-            agent = DDPGAgent(state_size=state_size, action_size=action_size)
-        elif AGENT_TYPE == 'A2C':
-            agent = A3CAgent(state_size=state_size, action_size=action_size, num_agents=num_agents)
-        else:
-            raise NotImplementedError()
-    if not TRAIN_MODE:
-        if AGENT_TYPE == 'DDPG':
-            agent = DDPGAgent(state_size=state_size, action_size=action_size)
+    if AGENT_TYPE == 'DDPG':
+        agent = DDPGAgent(state_size=state_size, action_size=action_size)
+        if LOAD_MODEL or not TRAIN_MODE:
             agent.load_model_into_DDPG_agent(model_path=MODEL_TO_LOAD)
-        elif AGENT_TYPE == 'A2C':
-            agent = A3CAgent(state_size=state_size, action_size=action_size, num_agents=num_agents)
-            agent.load_model_into_A2C_agent(model_path=MODEL_TO_LOAD)
-        else:
-            raise NotImplementedError()
+    elif AGENT_TYPE == 'A3C':
+        agent = A3CAgent(state_size=state_size, action_size=action_size, num_agents=num_agents)
+        if LOAD_MODEL or not TRAIN_MODE:
+            agent.load_model_into_A3C_agent(model_path=MODEL_TO_LOAD)
+    else:
+        raise NotImplementedError()
 
     run_environment(brain_name, agent)
 
@@ -81,6 +76,7 @@ def run_environment(brain_name, agent):
     scores_window = deque(maxlen=100)
     score_max = 0
     scores = []
+    score_mean_list = []
     saved_earliest_agent = False
 
     for i_episode in range(1, num_episodes + 1):
@@ -99,7 +95,7 @@ def run_environment(brain_name, agent):
         if ENV_NAME == 'REACHER':
             max_episode_length = 1000
         elif ENV_NAME == 'CRAWLER':
-            max_episode_length = 10000
+            max_episode_length = 1000
         else:
             raise NotImplementedError()
 
@@ -130,15 +126,16 @@ def run_environment(brain_name, agent):
             else:
                 score += np.mean(observed_reward)
 
-            if np.any(done):
+            if np.all(done):
                 break
 
         # save the obtained scores
         scores_window.append(score)
         scores.append(score)
         score_mean = np.mean(scores_window)
+        score_mean_list.append(score_mean)
 
-        score_max, saved_earliest_agent = plot_and_save_agent(agent, i_episode, score_max, scores, score_mean, score, saved_earliest_agent)
+        score_max, saved_earliest_agent = plot_and_save_agent(agent, i_episode, score_max, scores, score_mean, score_mean_list, score, saved_earliest_agent)
 
 
 def train_agent(action, agent, done, next_observed_state, observed_reward, prediction, state):
@@ -180,7 +177,7 @@ def act_in_environment(agent, state):
     return action, prediction
 
 
-def plot_and_save_agent(agent, i_episode, score_max, scores, scores_mean, score, saved_earliest_agent):
+def plot_and_save_agent(agent, i_episode, score_max, scores, scores_mean, score_mean_list, score, saved_earliest_agent):
     """
     Plots and saves the agent each 100th episode.
     Saves the agent, the current scores, the episode number, the trained parameters of the NN model and the hyper
@@ -197,23 +194,27 @@ def plot_and_save_agent(agent, i_episode, score_max, scores, scores_mean, score,
     """
 
     # evaluate every so often
+    #if i_episode % 10 == 0 and TRAIN_MODE:
+    #    print('\rEpisode {}\tAverage Score: {:.2f}'.format(i_episode, scores_mean), end="\n ")
+    #else:
+    #    print('\rEpisode {}\tScore for this episode {:.2f}:'.format(i_episode, score), end="")
+    print('\rEpisode {}\tScore for this episode {:.2f}\tApplied noise {:.5f}:'.format(i_episode, score, agent.network.std[0]), end="")
     if i_episode % 10 == 0 and TRAIN_MODE:
-        print('\rEpisode {}\tAverage Score: {:.2f}'.format(i_episode, scores_mean), end="\n ")
-    else:
-        print('\rEpisode {}\tScore for this episode {:.2f}:'.format(i_episode, score), end="")
-    if i_episode % 100 == 0 and TRAIN_MODE:
-        print('\nEpisode {}\tAverage Score: {:.2f}'.format(i_episode, scores_mean), end="")
-        save_score_plot(scores, i_episode)
+        print('\nEpisode {}\tAverage Score: {:.2f}'.format(i_episode, scores_mean))
+        save_score_plot(scores, score_mean_list, i_episode)
 
     if scores_mean >= score_max + SAVE_EACH_NEXT_BEST_REWARD and TRAIN_MODE:
-        agent.save_current_agent(score_max, scores, i_episode)
+        agent.save_current_agent(score_max, scores, score_mean_list, i_episode)
         score_max += SAVE_EACH_NEXT_BEST_REWARD
-        print('\nSaved agent with reward: {:.2f}\t after {:d} episodes!'.format(scores_mean, i_episode - 100))
+        print('\nSaved agent with reward: {:.2f}\t after {:d} episodes!'.format(scores_mean, i_episode))
+
+    if i_episode % 100 == 0 and TRAIN_MODE:
+        agent.save_current_agent(score_max, scores, score_mean_list, i_episode)
 
     if scores_mean >= NEEDED_REWARD_FOR_SOLVING_ENV and TRAIN_MODE and not saved_earliest_agent:
-        agent.save_current_agent(score_max, scores, i_episode)
+        agent.save_current_agent(score_max, scores, score_mean_list, i_episode)
         saved_earliest_agent = True
-        print('\nEnvironment solved in {:d} episodes!\tAverage Score: {:.2f} '.format(i_episode - 100, scores_mean))
+        print('\nEnvironment solved in {:d} episodes!\tAverage Score: {:.2f} '.format(i_episode, scores_mean))
 
     return score_max, saved_earliest_agent
 

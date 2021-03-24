@@ -6,21 +6,28 @@ import torch.optim as optim
 import numpy as np
 import torch
 
-from environment import device
+from actor_critic_net_all_in_one_crawler import ActorCriticNetCrawler
+from environment import device, ENV_NAME
 from save_and_plot import create_folder_structure_according_to_agent, save_score_plot
 from storage import Storage
 import torch.nn as nn
 from A3C_PARAMETERS import ACTIONS_BETWEEN_LEARNING, GAMMA, ENTROPY_WEIGHT, VALUE_LOS_WEIGHT, GRADIENT_CLIP, NOISE_REDUCTION_FACTOR, \
-    NOISE_ON_THE_ACTIONS
+    NOISE_ON_THE_ACTIONS, LEARNING_RATE, WEIGHT_DECAY, USE_GAE, GAE_TAU
 
 
 class A3CAgent:
 
     def __init__(self, state_size, action_size, num_agents=1, ):
-        self.network = ActorCriticNet(state_size=state_size,
-                                      action_size=action_size,
-                                      noise=NOISE_ON_THE_ACTIONS).to(device)
-        self.optimizer = optim.Adam(self.network.parameters(), lr=0.0003)
+        if ENV_NAME == "REACHER":
+            self.network = ActorCriticNet(state_size=state_size,
+                                          action_size=action_size,
+                                          noise=NOISE_ON_THE_ACTIONS).to(device)
+        elif ENV_NAME == "CRAWLER":
+            self.network = ActorCriticNetCrawler(state_size=state_size,
+                                                 action_size=action_size,
+                                                 noise=NOISE_ON_THE_ACTIONS).to(device)
+
+        self.optimizer = optim.Adam(self.network.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
         self.num_agents = num_agents
         self.action_size = action_size
         self.storage = Storage()
@@ -56,6 +63,7 @@ class A3CAgent:
         self.t_step = (self.t_step + 1) % ACTIONS_BETWEEN_LEARNING
         if self.t_step == 0:
             self.learn(state)
+            self.storage.empty()
 
     def learn(self, state):
         # run actor once more
@@ -67,13 +75,20 @@ class A3CAgent:
 
         returns_of_next_state = prediction['critic_value'].squeeze().detach()
 
+        advantages = torch.from_numpy(np.zeros((self.num_agents, 1))).to(device).squeeze()
         # reverse fill advantage and return
         for i in reversed(range(ACTIONS_BETWEEN_LEARNING)):
             returns_of_next_state = self.storage.reward[i] + GAMMA * self.storage.done[i] * returns_of_next_state
-            advantages = returns_of_next_state - self.storage.critic_value[i].squeeze().detach()
+            self.storage.returns[i] = returns_of_next_state.detach()
+
+            if not USE_GAE:
+                advantages = returns_of_next_state - self.storage.critic_value[i].squeeze().detach()
+            else:
+                if i < ACTIONS_BETWEEN_LEARNING-1:
+                    td_error = self.storage.reward[i] + GAMMA * self.storage.done[i] * self.storage.critic_value[i+1].squeeze() - self.storage.critic_value[i].squeeze()
+                    advantages = advantages * GAE_TAU * GAMMA * self.storage.done[i] + td_error
 
             self.storage.advantage[i] = advantages.detach()
-            self.storage.returns[i] = returns_of_next_state.detach()
 
         # calc the loss
         log_prob_a_tensor = torch.cat(self.storage.log_prob_a).squeeze()
@@ -89,16 +104,14 @@ class A3CAgent:
 
         self.optimizer.zero_grad()
         (policy_loss + ENTROPY_WEIGHT * entropy_loss + VALUE_LOS_WEIGHT * value_loss).backward()
+
         nn.utils.clip_grad_norm_(self.network.parameters(), GRADIENT_CLIP)
         self.optimizer.step()
 
-        # empty storage
-        self.storage.empty()
-
-    def load_model_into_A2C_agent(self, model_path):
+    def load_model_into_A3C_agent(self, model_path):
         self.network.load_state_dict(torch.load(model_path))
 
-    def save_current_agent(self, score_max, scores, i_episode):
+    def save_current_agent(self, score_max, scores, score_mean_list, i_episode):
         """
         Saves the current agent.
 
@@ -112,5 +125,5 @@ class A3CAgent:
         os.makedirs(new_folder_path, exist_ok=True)
         torch.save(self.network.state_dict(),
                    os.path.join(new_folder_path, f'checkpoint_{np.round(score_max, 2)}.pth'))
-        save_score_plot(scores, i_episode, path=new_folder_path)
+        save_score_plot(scores, score_mean_list, i_episode, path=new_folder_path)
         shutil.copyfile("A3C_PARAMETERS.py", os.path.join(new_folder_path, "A3C_PARAMETERS.py"))
