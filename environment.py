@@ -13,7 +13,7 @@ import torch
 # NEEDED_REWARD_FOR_SOLVING_ENV = 30
 
 ENV_PATH = '../Crawler_Linux/Crawler.x86'
-MODEL_TO_LOAD = 'A3C_CRAWLER/2021_03_24_00_21_50/checkpoint_300.pth'
+MODEL_TO_LOAD = 'A3C_CRAWLER/Exp_38_best_model/checkpoint_230.pth'
 AGENT_TYPE = 'A3C'
 ENV_NAME = 'CRAWLER'
 NEEDED_REWARD_FOR_SOLVING_ENV = 2000
@@ -22,4 +22,4 @@ NEEDED_REWARD_FOR_SOLVING_ENV = 2000
 
 # DEVICE PARAMETERS
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-SAVE_EACH_NEXT_BEST_REWARD = 100
+SAVE_EACH_NEXT_BEST_REWARD = 10

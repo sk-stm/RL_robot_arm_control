@@ -2,6 +2,7 @@ from collections import deque
 from unityagents import UnityEnvironment
 import numpy as np
 
+from A3C_PARAMETERS import MAX_EPISODE_LENGTH
 from ddpg_agent import DDPGAgent
 from a3c_agent import A3CAgent
 
@@ -10,7 +11,7 @@ from save_and_plot import save_score_plot
 
 env = UnityEnvironment(file_name=ENV_PATH)
 TRAIN_MODE = True
-LOAD_MODEL = False
+LOAD_MODEL = True
 num_episodes = 2000000
 
 
@@ -95,7 +96,7 @@ def run_environment(brain_name, agent):
         if ENV_NAME == 'REACHER':
             max_episode_length = 1000
         elif ENV_NAME == 'CRAWLER':
-            max_episode_length = 1000
+            max_episode_length = MAX_EPISODE_LENGTH
         else:
             raise NotImplementedError()
 
@@ -103,7 +104,6 @@ def run_environment(brain_name, agent):
         for i_times in range(max_episode_length):
             # take action in environment and get its response
             action, prediction = act_in_environment(agent, state)
-
             action = np.clip(action, -1, 1)
 
             env_info = env.step(action)[brain_name]

@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from environment import AGENT_TYPE, ENV_NAME
 
+fig = plt.figure()
 
 def create_folder_structure_according_to_agent():
     """
@@ -27,7 +28,6 @@ def save_score_plot(scores: List, score_mean_list: int, i_episode: int, path: st
     :param i_episode:   Current number of episodes
     :param path:        Path to the folder to store the plot to.
     """
-    fig = plt.figure()
     plt.plot(np.arange(len(scores)), scores)
     plt.plot(np.arange(len(score_mean_list)), score_mean_list, 'C1')
     plt.ylabel('Score')

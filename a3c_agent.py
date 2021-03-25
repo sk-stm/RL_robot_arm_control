@@ -27,6 +27,7 @@ class A3CAgent:
                                                  action_size=action_size,
                                                  noise=NOISE_ON_THE_ACTIONS).to(device)
 
+        self.mse = torch.nn.MSELoss()
         self.optimizer = optim.Adam(self.network.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
         self.num_agents = num_agents
         self.action_size = action_size
@@ -66,7 +67,8 @@ class A3CAgent:
             self.storage.empty()
 
     def learn(self, state):
-        # run actor once more
+        #with torch.autograd.detect_anomaly():
+            # run actor once more
         state_tensor = torch.from_numpy(state).float().to(device)
         prediction = self.network(state_tensor)
 
@@ -97,7 +99,10 @@ class A3CAgent:
 
         return_tensor = torch.cat(self.storage.returns).squeeze()
         critic_value_tensor = torch.cat(self.storage.critic_value).squeeze()
-        value_loss = 0.5 * (return_tensor - critic_value_tensor).pow(2).mean()
+        #value_loss = 0.5 * (return_tensor - critic_value_tensor).pow(2).mean()
+
+        value_loss = 0.5 * self.mse(return_tensor.float(), critic_value_tensor.float())
+        value_loss = value_loss.float()
 
         entropy_tensor = torch.cat(self.storage.entropy).squeeze()
         entropy_loss = entropy_tensor.mean()

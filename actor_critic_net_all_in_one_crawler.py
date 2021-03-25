@@ -43,8 +43,6 @@ class ActorCriticNetCrawler(nn.Module):
         if action is None:
             action = action_distribution.sample()
 
-        action = torch.clamp(action, -1, 1)
-
         # get log probability of the action to implement REINFORCE: https://pytorch.org/docs/stable/distributions.html
         action_log_prob = action_distribution.log_prob(action).sum(-1).unsqueeze(-1)
 

@@ -703,6 +703,7 @@ GAE_TAU = 0.95
 -> still Nan after 10 iterations. -> included reaky relu
 -> still the same
 
+# Exp 34
 
 GAMMA = 0.99
 GRADIENT_CLIP = 0.01
@@ -716,3 +717,143 @@ WEIGHT_DECAY = 1e-5
 USE_GAE = True
 GAE_TAU = 0.95
 
+-> nan after 400 iterations.
+
+# Exp 35
+
+Pretrained model parameters: A3C_CRAWLER/2021_03_24_10_46_46/checkpoint_200.pth
+GAMMA = 0.99
+GRADIENT_CLIP = 0.01
+ENTROPY_WEIGHT = 0.001
+VALUE_LOS_WEIGHT = 1
+ACTIONS_BETWEEN_LEARNING = 3
+NOISE_ON_THE_ACTIONS = 0
+NOISE_REDUCTION_FACTOR = 1
+LEARNING_RATE = 0.00003
+WEIGHT_DECAY = 1e-5
+USE_GAE = True
+GAE_TAU = 0.95
+
+-> pretty noisy, nan after ~ 600 iterations so better?
+
+# inbetween exp:
+LEARNING_RATE = 0.03 -> diverging in the begining ~10 iterations
+LEARNING_RATE = 0.003 -> not diverging but weired local minimum at ~40 iterations
+
+# Exp 36
+
+GAMMA = 0.99
+GRADIENT_CLIP = 0.1
+ENTROPY_WEIGHT = 0.001
+VALUE_LOS_WEIGHT = 1
+ACTIONS_BETWEEN_LEARNING = 5
+NOISE_ON_THE_ACTIONS = 1e-3
+NOISE_REDUCTION_FACTOR = 0.99
+LEARNING_RATE = 0.0003
+WEIGHT_DECAY = 1e-5
+USE_GAE = True
+GAE_TAU = 0.95
+MAX_EPISODE_LENGTH = 500
+
+-> slower learning w.r.t Exp 31, due to smaller gradient clipping let's see where it ends.
+-> Maybe larger gradient cliping in the begining and smaller later on... again another paramter...
+thought: maybe the agent learns to jump again so much because at the end of an episode it has to reach as far
+as possible so extending the MAX_EPISODE_LENGTH might be another step for optimization
+
+nan error trace:
+```
+Episode 698	Score for this episode 254.07	Applied noise 0.00000:[W python_anomaly_mode.cpp:104] Warning: Error detected in PowBackward0. Traceback of forward call that caused the error:
+  File "/home/shinchan/Projekte/Reinforcement_learning/Udacity/project_1/deep-reinforcement-learning/p2_continuous-control/RL_robot_arm_control/main.py", line 227, in <module>
+    main()
+  File "/home/shinchan/Projekte/Reinforcement_learning/Udacity/project_1/deep-reinforcement-learning/p2_continuous-control/RL_robot_arm_control/main.py", line 32, in main
+    run_environment(brain_name, agent)
+  File "/home/shinchan/Projekte/Reinforcement_learning/Udacity/project_1/deep-reinforcement-learning/p2_continuous-control/RL_robot_arm_control/main.py", line 123, in run_environment
+    train_agent(action, agent, done, next_observed_state, observed_reward, prediction, state)
+  File "/home/shinchan/Projekte/Reinforcement_learning/Udacity/project_1/deep-reinforcement-learning/p2_continuous-control/RL_robot_arm_control/main.py", line 159, in train_agent
+    agent.step(state, prediction, observed_reward, done)
+  File "/home/shinchan/Projekte/Reinforcement_learning/Udacity/project_1/deep-reinforcement-learning/p2_continuous-control/RL_robot_arm_control/a3c_agent.py", line 65, in step
+    self.learn(state)
+  File "/home/shinchan/Projekte/Reinforcement_learning/Udacity/project_1/deep-reinforcement-learning/p2_continuous-control/RL_robot_arm_control/a3c_agent.py", line 101, in learn
+    value_loss = 0.5 * (return_tensor - critic_value_tensor).pow(2).mean()
+ (function _print_stack)
+Traceback (most recent call last):
+  File "/home/shinchan/Projekte/Reinforcement_learning/Udacity/project_1/deep-reinforcement-learning/p2_continuous-control/RL_robot_arm_control/main.py", line 227, in <module>
+    main()
+  File "/home/shinchan/Projekte/Reinforcement_learning/Udacity/project_1/deep-reinforcement-learning/p2_continuous-control/RL_robot_arm_control/main.py", line 32, in main
+    run_environment(brain_name, agent)
+  File "/home/shinchan/Projekte/Reinforcement_learning/Udacity/project_1/deep-reinforcement-learning/p2_continuous-control/RL_robot_arm_control/main.py", line 123, in run_environment
+    train_agent(action, agent, done, next_observed_state, observed_reward, prediction, state)
+  File "/home/shinchan/Projekte/Reinforcement_learning/Udacity/project_1/deep-reinforcement-learning/p2_continuous-control/RL_robot_arm_control/main.py", line 159, in train_agent
+    agent.step(state, prediction, observed_reward, done)
+  File "/home/shinchan/Projekte/Reinforcement_learning/Udacity/project_1/deep-reinforcement-learning/p2_continuous-control/RL_robot_arm_control/a3c_agent.py", line 65, in step
+    self.learn(state)
+  File "/home/shinchan/Projekte/Reinforcement_learning/Udacity/project_1/deep-reinforcement-learning/p2_continuous-control/RL_robot_arm_control/a3c_agent.py", line 107, in learn
+    (policy_loss + ENTROPY_WEIGHT * entropy_loss + VALUE_LOS_WEIGHT * value_loss).backward()
+  File "/home/shinchan/Projekte/Reinforcement_learning/Udacity/project_1/deep-reinforcement-learning/p2_continuous-control/p2_env_36/lib/python3.6/site-packages/torch/tensor.py", line 221, in backward
+    torch.autograd.backward(self, gradient, retain_graph, create_graph)
+  File "/home/shinchan/Projekte/Reinforcement_learning/Udacity/project_1/deep-reinforcement-learning/p2_continuous-control/p2_env_36/lib/python3.6/site-packages/torch/autograd/__init__.py", line 132, in backward
+    allow_unreachable=True)  # allow_unreachable flag
+RuntimeError: Function 'PowBackward0' returned nan values in its 0th output.
+
+Process finished with exit code 1
+```
+
+**Seems an error in MSE. This is expected since I read about it in one of the intros to pytorch losses -> use the
+pytorch internal MSE instead.**
+
+# Exp 37
+
+GAMMA = 0.99
+GRADIENT_CLIP = 0.2
+ENTROPY_WEIGHT = 0.001
+VALUE_LOS_WEIGHT = 1
+ACTIONS_BETWEEN_LEARNING = 5
+NOISE_ON_THE_ACTIONS = 1e-5
+NOISE_REDUCTION_FACTOR = 0.99
+LEARNING_RATE = 0.0003
+WEIGHT_DECAY = 1e-5
+USE_GAE = True
+GAE_TAU = 0.95
+MAX_EPISODE_LENGTH = 500
+
+-> didn't work. Still nan...
+
+
+# Exp 38
+
+GAMMA = 0.99
+GRADIENT_CLIP = 0.1
+ENTROPY_WEIGHT = 0.001
+VALUE_LOS_WEIGHT = 1
+ACTIONS_BETWEEN_LEARNING = 5
+NOISE_ON_THE_ACTIONS = 1e-5
+NOISE_REDUCTION_FACTOR = 0.99
+LEARNING_RATE = 0.0003
+WEIGHT_DECAY = 1e-5
+USE_GAE = True
+GAE_TAU = 0.95
+MAX_EPISODE_LENGTH = 500
+
+-> looks good until nan happened. So next will be fine tune from this position + less weight decay and smaller learning rate.
+
+# Exp 39
+
+MODEL_TO_LOAD = 'A3C_CRAWLER/Exp_38_best_model/checkpoint_230.pth'
+GAMMA = 0.99
+GRADIENT_CLIP = 0.1
+ENTROPY_WEIGHT = 0.001
+VALUE_LOS_WEIGHT = 1
+ACTIONS_BETWEEN_LEARNING = 5
+NOISE_ON_THE_ACTIONS = 0
+NOISE_REDUCTION_FACTOR = 1
+LEARNING_RATE = 0.00003
+WEIGHT_DECAY = 1e-7
+USE_GAE = True
+GAE_TAU = 0.95
+MAX_EPISODE_LENGTH = 1000
+
+-> der Fahler wird sein, dass der Reward einer Episode von vorne beginnen muss wenn der Agent hingefallen ist
+Momentan wird einfach weitergerechnet. Das irgendwie auch zum Ziel führen kann, aber nicht ganz so sauber und direkt.
+Wahrscheinlich müsste man doch alle Agenten der Env in separaten Prozessen einzeln abfertigen und dann geballt auf
+der collecteted Erfahrung trainieren. Meinetwegen mit batches. Die frage ist dann nur, wie füllt man die batches, die
+Vorzeitig terminiert sind?
