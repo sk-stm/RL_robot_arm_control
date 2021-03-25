@@ -89,6 +89,9 @@ class A3CAgent:
                 if i < ACTIONS_BETWEEN_LEARNING-1:
                     td_error = self.storage.reward[i] + GAMMA * self.storage.done[i] * self.storage.critic_value[i+1].squeeze() - self.storage.critic_value[i].squeeze()
                     advantages = advantages * GAE_TAU * GAMMA * self.storage.done[i] + td_error
+                else:
+                    td_error = self.storage.reward[i] + GAMMA * self.storage.done[i] * returns_of_next_state - self.storage.critic_value[i].squeeze()
+                    advantages = advantages * GAE_TAU * GAMMA * self.storage.done[i] + td_error
 
             self.storage.advantage[i] = advantages.detach()
 
