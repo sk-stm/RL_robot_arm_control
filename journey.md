@@ -852,8 +852,78 @@ USE_GAE = True
 GAE_TAU = 0.95
 MAX_EPISODE_LENGTH = 1000
 
--> der Fahler wird sein, dass der Reward einer Episode von vorne beginnen muss wenn der Agent hingefallen ist
+-> der Fehler wird sein, dass der Reward einer Episode von vorne beginnen muss wenn der Agent hingefallen ist
 Momentan wird einfach weitergerechnet. Das irgendwie auch zum Ziel führen kann, aber nicht ganz so sauber und direkt.
 Wahrscheinlich müsste man doch alle Agenten der Env in separaten Prozessen einzeln abfertigen und dann geballt auf
 der collecteted Erfahrung trainieren. Meinetwegen mit batches. Die frage ist dann nur, wie füllt man die batches, die
 Vorzeitig terminiert sind?
+
+Nun Es ist A2C. Da werden für alle Agenten Observations eingesammelt bis der buffer voll ist. Und dann wird mit einem
+mal das NN geupdated. Das passiert hier. Dass die Agenten von vorne beginnen ist dabei kein großes Problem, weil die
+meisten Runs so funktionieren wie sie sollen wenn man ACTIONS_BETWEEN_LEARNING klein genug hält. Was allergins falsch
+war ist die der Druchschnittliche Reward gerechnet wurde. Es muss jeder Agent einmal durchlaufen und, und wenn er
+gefallen ist darf der nächste Reward nicht mitgezählt werden oder muss als separater run mit ins Ergebnis einfließen.
+Bisher habe ich immer naiv weitergezählt, was zu Zahlen in Abhängigkeit von der Episodenlänge geführt hat. Das is
+natürlich quatsch. Jetzt lasse ich die simulation solange laufen bis jeder Agent mindestens einmal hingefallen ist.
+Danach gibts einen restart. Agenten die häufiger hinfallen während ein anderer noch läuft startet von vorne und darf
+weiter trainieren, wird aber geresettet wenn der letzte Agent das erste mal hingefallen ist.
+Das Problem hierbei ist, dass Agenten die zwar am Anfang einmal hingefallen sind, danach aber durch Zufall eine optimale
+Laufstrategie anfangen, trotzdem neugetartet werden, wenn der letzte Agent das erste mal hin fällt.
+
+# Exp 40
+
+MODEL_TO_LOAD = 'A2C_CRAWLER/2021_03_26_00_47_52/checkpoint_195.59.pth'
+GAMMA = 0.99
+GRADIENT_CLIP = 0.05
+ENTROPY_WEIGHT = 0.001
+VALUE_LOS_WEIGHT = 1
+ACTIONS_BETWEEN_LEARNING = 10
+NOISE_ON_THE_ACTIONS = 0
+NOISE_REDUCTION_FACTOR = 1
+LEARNING_RATE = 0.00001
+WEIGHT_DECAY = 1e-7
+USE_GAE = True
+GAE_TAU = 0.95
+MAX_EPISODE_LENGTH = 10000
+
+-> now and then a big negative reward is collected for some reason messing up the statistics
+
+# Exp 41
+
+MODEL_TO_LOAD = 'A2C_CRAWLER/2021_03_26_00_47_52/checkpoint_195.59.pth'
+GAMMA = 0.99
+GRADIENT_CLIP = 0.05
+ENTROPY_WEIGHT = 0.001
+VALUE_LOS_WEIGHT = 1
+ACTIONS_BETWEEN_LEARNING = 5
+NOISE_ON_THE_ACTIONS = 0
+NOISE_REDUCTION_FACTOR = 1
+LEARNING_RATE = 0.000003
+WEIGHT_DECAY = 1e-7
+USE_GAE = True
+GAE_TAU = 0.95
+MAX_EPISODE_LENGTH = 10000
+
+-> not much better
+
+# Exp 42
+
+A2C_CRAWLER/2021_03_26_14_19_23/checkpoint_313.5.pth
+GAMMA = 0.99
+GRADIENT_CLIP = 0.05
+ENTROPY_WEIGHT = 0.001
+VALUE_LOS_WEIGHT = 1
+ACTIONS_BETWEEN_LEARNING = 5
+NOISE_ON_THE_ACTIONS = 0
+NOISE_REDUCTION_FACTOR = 1
+LEARNING_RATE = 0.00003
+WEIGHT_DECAY = 1e-7
+USE_GAE = True
+GAE_TAU = 0.95
+MAX_EPISODE_LENGTH = 10000
+
+-> it's not getting better. I skip this!
+Next steps:
+Rethink the whole reward process
+Find the reason for the nan returns
+Clean up implementation

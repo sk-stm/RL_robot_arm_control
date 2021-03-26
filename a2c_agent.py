@@ -11,11 +11,11 @@ from environment import device, ENV_NAME
 from save_and_plot import create_folder_structure_according_to_agent, save_score_plot
 from storage import Storage
 import torch.nn as nn
-from A3C_PARAMETERS import ACTIONS_BETWEEN_LEARNING, GAMMA, ENTROPY_WEIGHT, VALUE_LOS_WEIGHT, GRADIENT_CLIP, NOISE_REDUCTION_FACTOR, \
+from A2C_PARAMETERS import ACTIONS_BETWEEN_LEARNING, GAMMA, ENTROPY_WEIGHT, VALUE_LOS_WEIGHT, GRADIENT_CLIP, NOISE_REDUCTION_FACTOR, \
     NOISE_ON_THE_ACTIONS, LEARNING_RATE, WEIGHT_DECAY, USE_GAE, GAE_TAU
 
 
-class A3CAgent:
+class A2CAgent:
 
     def __init__(self, state_size, action_size, num_agents=1, ):
         if ENV_NAME == "REACHER":
@@ -134,4 +134,4 @@ class A3CAgent:
         torch.save(self.network.state_dict(),
                    os.path.join(new_folder_path, f'checkpoint_{np.round(score_max, 2)}.pth'))
         save_score_plot(scores, score_mean_list, i_episode, path=new_folder_path)
-        shutil.copyfile("A3C_PARAMETERS.py", os.path.join(new_folder_path, "A3C_PARAMETERS.py"))
+        shutil.copyfile("A2C_PARAMETERS.py", os.path.join(new_folder_path, "A2C_PARAMETERS.py"))

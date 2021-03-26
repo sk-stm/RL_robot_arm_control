@@ -1,4 +1,3 @@
-import os
 from collections import deque
 from unityagents import UnityEnvironment
 import numpy as np
@@ -10,45 +9,34 @@ from a2c_agent import A2CAgent
 from environment import ENV_PATH, MODEL_TO_LOAD, AGENT_TYPE, ENV_NAME, NEEDED_REWARD_FOR_SOLVING_ENV, SAVE_EACH_NEXT_BEST_REWARD
 from save_and_plot import save_score_plot
 
+import multiprocessing as mp
+
+env = UnityEnvironment(file_name=ENV_PATH)
 TRAIN_MODE = True
 LOAD_MODEL = True
 num_episodes = 2000000
 
 
 def main():
-    model_load_path = MODEL_TO_LOAD
-    env = UnityEnvironment(file_name=ENV_PATH)
-
-    # while True:
-    brain_name, num_agents, agent_states, state_size, action_size = init_env(env=env)
+    brain_name, num_agents, agent_states, state_size, action_size = init_env()
 
     if AGENT_TYPE == 'DDPG':
         agent = DDPGAgent(state_size=state_size, action_size=action_size)
         if LOAD_MODEL or not TRAIN_MODE:
-            agent.load_model_into_DDPG_agent(model_path=model_load_path)
-    elif AGENT_TYPE == 'A2C':
+            agent.load_model_into_DDPG_agent(model_path=MODEL_TO_LOAD)
+    elif AGENT_TYPE == 'A3C':
         agent = A2CAgent(state_size=state_size, action_size=action_size, num_agents=num_agents)
         if LOAD_MODEL or not TRAIN_MODE:
-            agent.load_model_into_A3C_agent(model_path=model_load_path)
+            agent.load_model_into_A3C_agent(model_path=MODEL_TO_LOAD)
     else:
         raise NotImplementedError()
 
-    # try:
-    run_environment(env, brain_name, agent)
-    # except ArithmeticError:
-    #     latest_model_save = os.listdir("A2C_CRAWLER")
-    #     latest_model_save.sort()
-    #     latest_model_save = latest_model_save[-1]
-    #     latest_model_folder = os.path.join("A2C_CRAWLER", latest_model_save)
-    #     dir_content = os.listdir(latest_model_folder)
-    #     dir_content.sort()
-    #     checkpoint_file_name = dir_content[1]
-    #     model_load_path = os.path.join(latest_model_folder, checkpoint_file_name)
+    run_environment(brain_name, agent)
 
     env.close()
 
 
-def init_env(env):
+def init_env():
     """
     Initialized the environment.
 
@@ -80,7 +68,7 @@ def init_env(env):
     return brain_name, num_agents, agent_states, state_size, action_size
 
 
-def run_environment(env, brain_name, agent):
+def run_environment(brain_name, agent):
     """
     Runs the environment and the agent.
 
@@ -94,8 +82,9 @@ def run_environment(env, brain_name, agent):
     score_mean_list = []
     saved_earliest_agent = False
 
-    for i_episode in range(1, num_episodes + 1):
+    pool = mp.Pool(mp.cpu_count())
 
+    for i_episode in range(1, num_episodes + 1):
         score = 0
         # get first state of environment
         env_info = env.reset(train_mode=TRAIN_MODE)[brain_name]
@@ -116,8 +105,6 @@ def run_environment(env, brain_name, agent):
             raise NotImplementedError()
 
         # act in the environment
-        done_agents = np.zeros(agent.num_agents)
-
         for i_times in range(max_episode_length):
             # take action in environment and get its response
             action, prediction = act_in_environment(agent, state)
@@ -135,7 +122,7 @@ def run_environment(env, brain_name, agent):
                 observed_reward = [0.1 if rew > 0 else 0 for rew in observed_reward]
 
             if TRAIN_MODE:
-                train_agent(action, agent, done, next_observed_state, observed_reward, prediction, state)
+                train_agent(action, agent, done, next_observed_state, observed_reward, prediction, state, pool)
 
             state = next_observed_state
 
@@ -143,24 +130,10 @@ def run_environment(env, brain_name, agent):
             if agent.num_agents == 1:
                 score += observed_reward[0]
             else:
-                score += np.mean(np.array(observed_reward)[np.where(done_agents == False)])
+                score += np.mean(observed_reward)
 
-            done_agents[np.where(np.array(done) == True)] = True
-
-            if np.all(done_agents):
+            if np.all(done):
                 break
-
-        if np.isnan(score):
-            score = score_mean
-            latest_model_save = os.listdir("A2C_CRAWLER")
-            latest_model_save.sort()
-            latest_model_save = latest_model_save[-1]
-            latest_model_folder = os.path.join("A2C_CRAWLER", latest_model_save)
-            dir_content = os.listdir(latest_model_folder)
-            dir_content.sort()
-            checkpoint_file_name = dir_content[1]
-            model_load_path = os.path.join(latest_model_folder, checkpoint_file_name)
-            agent.load_model_into_A3C_agent(model_path=model_load_path)
 
         # save the obtained scores
         scores_window.append(score)
@@ -171,7 +144,7 @@ def run_environment(env, brain_name, agent):
         score_max, saved_earliest_agent = plot_and_save_agent(agent, i_episode, score_max, scores, score_mean, score_mean_list, score, saved_earliest_agent)
 
 
-def train_agent(action, agent, done, next_observed_state, observed_reward, prediction, state):
+def train_agent(action, agent, done, next_observed_state, observed_reward, prediction, state, pool):
     """
     Perform a training step on the agent
     :param state:               np.array, current state of the environment
@@ -185,6 +158,7 @@ def train_agent(action, agent, done, next_observed_state, observed_reward, predi
     if type(agent) == DDPGAgent:
         agent.step(state, action, next_observed_state, observed_reward, done)
     elif type(agent) == A2CAgent:
+        #pool.starmap(agent.step, [(s, p, o, d) for s, p, o, d in zip(state, prediction, observed_reward, done)])
         agent.step(state, prediction, observed_reward, done)
     else:
         raise NotImplementedError
@@ -236,9 +210,9 @@ def plot_and_save_agent(agent, i_episode, score_max, scores, scores_mean, score_
         print('\nEpisode {}\tAverage Score: {:.2f}'.format(i_episode, scores_mean))
         save_score_plot(scores, score_mean_list, i_episode)
 
-    if scores_mean >= score_max + SAVE_EACH_NEXT_BEST_REWARD and TRAIN_MODE and i_episode > 10:
+    if scores_mean >= score_max + SAVE_EACH_NEXT_BEST_REWARD and TRAIN_MODE:
         agent.save_current_agent(score_max, scores, score_mean_list, i_episode)
-        score_max = scores_mean + SAVE_EACH_NEXT_BEST_REWARD
+        score_max += SAVE_EACH_NEXT_BEST_REWARD
         print('\nSaved agent with reward: {:.2f}\t after {:d} episodes!'.format(scores_mean, i_episode))
 
     if i_episode % 100 == 0 and TRAIN_MODE:
