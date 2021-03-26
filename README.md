@@ -24,8 +24,8 @@ The environment is considered solved if the agent get an **average reward of >=3
 ## Installation
 
 1. Create virtual python environment and source it:
-    - `python3.6 -m venv p1_env`
-    - `source p1_env/bin/activate`
+    - `python3.6 -m venv p2_env`
+    - `source p2_env/bin/activate`
     - `pip install -U pip`
 2. Clone repository:
     - `git clone https://github.com/sk-stm/RL_robot_arm_control.git`
@@ -45,5 +45,6 @@ The environment is considered solved if the agent get an **average reward of >=3
 2. Run main.py and the agent start training in the environment.
 
 ## Run inference:
-1. Set the `TRAIN_MODE` variable in `main.py` to `False`
-2. Run main.py and the agent start training in the environment.
+1. Set the `ENV_PATH` variable to the environment you just downloaded.
+2. Set the `TRAIN_MODE` variable in `main.py` to `False`.
+3. Run `python main.py` and the agent start observing in the environment.
